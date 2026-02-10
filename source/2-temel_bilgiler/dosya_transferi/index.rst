@@ -66,12 +66,95 @@ Linux ve macOS Kullanıcıları
 
 **Gelişmiş Kullanım - Paralel Aktarım:**
 
-Büyük veri setleri için GNU Parallel ile paralel aktarım:
+Çok sayıda dosya veya büyük veri setleri aktarırken, paralel aktarım yöntemleri kullanarak transfer süresini önemli ölçüde kısaltabilirsiniz. Aşağıda farklı senaryolar için paralel aktarım yöntemleri açıklanmıştır.
+
+.. warning::
+
+   SSH sunucuları eşzamanlı bağlantı sayısını sınırlandırır. Çok fazla paralel işlem (``-j`` değeri) açmak **"Connection refused"** veya **"Too many connections"** hatalarına neden olabilir. 
+   
+   - Önerilen maksimum paralel işlem sayısı: **4-8** arası
+   - Daha yüksek değerler kullanmadan önce küçük bir test yapın
+
+**Senaryo 1: Dizindeki Tüm Dosyaları Paralel Aktarma**
+
+Bir dizindeki tüm dosyaları paralel olarak aktarmak için ``find`` ve ``parallel`` kombinasyonunu kullanabilirsiniz:
 
 .. code-block:: bash
 
-    # 7 paralel işlem ile aktarım
-    parallel -j 7 rsync -av {} kullanici_adi@<arayuz-ip-adresi>:/hedef/dizin/ ::: dosya1 dosya2 dosya3
+    # Mevcut dizindeki tüm dosyaları 4 paralel işlemle aktarma
+    find . -type f | parallel -j 4 rsync -av {} kullanici_adi@<arayuz-ip-adresi>:/hedef/dizin/
+    
+    # Belirli uzantıdaki dosyaları aktarma (örn: .dat dosyaları)
+    find . -name "*.dat" -type f | parallel -j 4 rsync -av {} kullanici_adi@<arayuz-ip-adresi>:/hedef/dizin/
+
+**Senaryo 2: Dosya Listesinden Aktarım**
+
+Aktarılacak dosyaların listesi bir dosyada tutuluyorsa:
+
+.. code-block:: bash
+
+    # dosya_listesi.txt içindeki her satır bir dosya yolunu içerir
+    parallel -j 4 -a dosya_listesi.txt rsync -av {} kullanici_adi@<arayuz-ip-adresi>:/hedef/dizin/
+
+**Senaryo 3: Alt Dizinleri Paralel Aktarma**
+
+Büyük bir dizin yapısını alt dizinler bazında paralel aktarmak için:
+
+.. code-block:: bash
+
+    # Her alt dizini ayrı bir rsync işlemiyle aktarma
+    ls -d */ | parallel -j 4 rsync -av {} kullanici_adi@<arayuz-ip-adresi>:/hedef/dizin/
+
+**fpsync ile Büyük Ölçekli Paralel Aktarım**
+
+`fpsync <https://www.fpart.org/fpsync/>`_, petabayt ölçeğindeki veri aktarımları için optimize edilmiş bir araçtır. GNU Parallel'den farklı olarak, kendi zamanlayıcısına sahiptir ve aktarımı otomatik olarak parçalara böler.
+
+.. note::
+
+   ``fpsync`` kullanmak için önce ``fpart`` paketinin kurulu olması gerekmektedir:
+
+   .. code-block:: bash
+
+       # macOS
+       brew install fpart
+       
+       # Ubuntu/Debian
+       sudo apt-get install fpart
+       
+       # CentOS/RHEL (EPEL gerektirir)
+       sudo yum install fpart
+
+**fpsync Temel Kullanımı:**
+
+.. code-block:: bash
+
+    # 4 paralel worker ile aktarım
+    # Her worker maksimum 1000 dosya ve 100 MB aktarır
+    fpsync -n 4 -f 1000 -s $((100 * 1024 * 1024)) \
+        /yerel/dizin/ kullanici_adi@<arayuz-ip-adresi>:/hedef/dizin/
+
+**fpsync Parametreleri:**
+
+- ``-n``: Paralel worker (işlem) sayısı
+- ``-f``: Worker başına maksimum dosya sayısı
+- ``-s``: Worker başına maksimum aktarım boyutu (byte)
+- ``-r``: Önceki aktarımı devam ettir (resume)
+- ``-v``: Detaylı çıktı
+
+**fpsync Avantajları:**
+
+- Dosya sistemi taraması sırasında aktarım başlar (bekleme yok)
+- Kesintiye uğrayan aktarımlar devam ettirilebilir (``-r`` parametresi)
+- Düşük bellek kullanımı (milyonlarca dosya için bile)
+- İlerleme durumu takibi
+- Çoklu node desteği (``-w`` parametresi ile uzak worker'lar)
+
+.. note::
+
+   **Ne Zaman Hangisini Kullanmalı?**
+   
+   - **GNU Parallel**: Basit senaryolar, az sayıda dosya (yüzler, binler)
+   - **fpsync**: Büyük veri setleri (on binlerce+ dosya), petabayt ölçeğinde veriler, devam ettirilebilir aktarımlar
 
 2. `scp` Kullanımı
 ^^^^^^^^^^^^^^^^^^
