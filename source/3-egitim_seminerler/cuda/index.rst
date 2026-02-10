@@ -15,6 +15,7 @@ CUDA
    04_bellek_veri_locality/index
    05_is_parcacigi_yurutme_verimliligi/index
    06_bellek_erisim_performans/index
+   performans_optimizasyon_verimlilik/index
 
 
 .. toctree::
